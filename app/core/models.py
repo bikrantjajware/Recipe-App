@@ -46,6 +46,7 @@ class Tag(models.Model):
     def __str__(self):
         return self.name
 
+
 class Ingredient(models.Model):
     """Ingredient to be used in recipe"""
     name = models.CharField(max_length=200)
