@@ -33,6 +33,6 @@ class RecipeSerializer(serializers.ModelSerializer):
 
 
 class RecipeDetailSerializer(RecipeSerializer):
-    """ sserialize a recipe detail view"""
+    """ serialize a recipe detail view"""
     ingredient = IngredientSerializer(many=True,read_only=True)
     tag = TagSerializer(many=True,read_only=True)

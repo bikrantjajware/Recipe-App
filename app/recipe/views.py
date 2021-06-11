@@ -53,3 +53,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if self.action == 'retrieve':
             return RecipeDetailSerializer
         return self.serializer_class
+
+    def perform_create(self, serializer):
+        """ create a new recipe object"""
+        serializer.save(user=self.request.user)

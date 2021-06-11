@@ -64,7 +64,7 @@ class Recipe(models.Model):
     time_minutes = models.IntegerField()
     tag = models.ManyToManyField('Tag')
     ingredient = models.ManyToManyField('Ingredient')
-    link = models.CharField(max_length=200,blank=True)
+    link = models.CharField(max_length=200,blank=True,null=True)
 
     def __str__(self):
         """ return string representation """
