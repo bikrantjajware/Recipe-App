@@ -1,3 +1,7 @@
+# used to create a temporary file
+import tempfile
+import os
+from PIL import Image
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -11,6 +15,11 @@ import json
 
 
 RECIPE_URL = reverse('recipe:recipe-list')
+
+
+def image_upload_url(recipe_id):
+    """ generate url for uploading image"""
+    return reverse('recipe:recipe-upload-image',args=[recipe_id])
 
 
 def detail_url(recipe_id):
@@ -188,3 +197,77 @@ class PrivateRecipeApiTest(TestCase):
         tags = recipe.tag.all()
         self.assertEqual(len(tags),0)
         self.assertEqual(recipe.user,self.user)
+
+
+class RecipeImageUploadTests(TestCase):
+    """ test cases for uploading image"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_user(email="testemail@test.com",password="testpass")
+        self.client.force_authenticate(self.user)
+        self.recipe = sample_recipe(user=self.user)
+
+    def tearDown(self):
+        """ called after the test case call is finished"""
+        self.recipe.image.delete()
+
+    def test_upload_image_to_recipe(self):
+        """test uploading image to recipe, (1) create an temp file and save image into it"""
+        url = image_upload_url(self.recipe.id)
+
+        with tempfile.NamedTemporaryFile(suffix='.jpg') as ntf:
+            img = Image.new('RGB',(10,10))
+            img.save(ntf,format='JPEG')
+            ntf.seek(0)
+            res = self.client.patch(url,{'image':ntf},format='multipart')
+        # print(res.data)
+        self.recipe.refresh_from_db()
+        self.assertIn('image', res.data)
+        self.assertEqual(res.status_code,status.HTTP_200_OK)
+
+        self.assertTrue(os.path.exists(self.recipe.image.path))
+
+    def test_upload_image_bad_request(self):
+        """ test uploading a bad image"""
+        url = image_upload_url(self.recipe.id)
+        res = self.client.post(url,{'image':'notimage'},format='multipart')
+        self.assertEqual(res.status_code,status.HTTP_400_BAD_REQUEST)
+
+    def test_filter_recipe_by_tags(self):
+        """test returning recipe's with specific tags"""
+        recipe1 = sample_recipe(user=self.user,title='chicken curry')
+        recipe2 = sample_recipe(user=self.user,title='mutton curry')
+        recipe3 = sample_recipe(user=self.user,title='milk dish')
+        tag1 = sample_tag(user=self.user,name='chicken')
+        tag2 = sample_tag(user=self.user,name='mutton')
+        recipe1.tag.add(tag1)
+        recipe2.tag.add(tag2)
+
+        res = self.client.get(RECIPE_URL,{'tag':f'{tag1.id},{tag2.id}'})
+        s1 = RecipeSerializer(recipe1)
+        s2 = RecipeSerializer(recipe2)
+        s3 = RecipeSerializer(recipe3)
+        self.assertIn(s1.data,res.data)
+        self.assertIn(s2.data,res.data)
+        self.assertNotIn(s3.data,res.data)
+
+    def test_filter_recipe_by_ingredients(self):
+        """test returning recipe's with specific ingredients"""
+        recipe1 = sample_recipe(user=self.user, title='chicken curry')
+        recipe2 = sample_recipe(user=self.user, title='mutton curry')
+        recipe3 = sample_recipe(user=self.user, title='milk dish')
+        ing1 = sample_ingredient(user=self.user,name='chicken')
+        ing2 = sample_ingredient(user=self.user,name='mutton')
+        recipe1.ingredient.add(ing1)
+        recipe2.ingredient.add(ing2)
+
+        res = self.client.get(RECIPE_URL,{'ingredient':f'{ing1.id},{ing2.id}'})
+
+        serializer1 = RecipeSerializer(recipe1)
+        serializer2 = RecipeSerializer(recipe2)
+        serializer3 = RecipeSerializer(recipe3)
+
+        self.assertIn(serializer1.data,res.data)
+        self.assertIn(serializer2.data,res.data)
+        self.assertNotIn(serializer3.data,res.data)
