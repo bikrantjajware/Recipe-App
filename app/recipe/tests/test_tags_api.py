@@ -7,7 +7,7 @@ import json
 
 
 from recipe.serializers import TagSerializer
-from core.models import Tag
+from core.models import Tag,Recipe
 
 
 TAG_URL = reverse('recipe:tag-list')
@@ -74,3 +74,41 @@ class PrivateTagsApiTests(TestCase):
         payload = {'name':''}
         res = self.client.post(TAG_URL,payload)
         self.assertEqual(res.status_code,status.HTTP_400_BAD_REQUEST)
+
+    def test_retrieve_tags_assigned_to_recipes(self):
+        """retrieve tags that are assigned to any recipes"""
+        tag1 = Tag.objects.create(user=self.user,name='breakfast')
+        tag2 = Tag.objects.create(user=self.user,name='lunch')
+        recipe = Recipe.objects.create(user=self.user,title='egg bread toast',time_minutes=15,price=10.0)
+        recipe.tag.add(tag1)
+        res = self.client.get(TAG_URL,{'assigned_only':1})
+
+        s1 = TagSerializer(tag1)
+        s2 = TagSerializer(tag2)
+
+        self.assertIn(s1.data,res.data)
+        self.assertNotIn(s2.data,res.data)
+
+    def test_retrieve_tag_assigned_unique(self):
+        """ test that filtering tags by assigned returns unique tags, django by default will return 2 copy of tags
+         if the same tag is assigned to 2 recipes"""
+        tag1 = Tag.objects.create(user=self.user,name='breakfast')
+        Tag.objects.create(user=self.user,name='lunch')
+        recipe1 = Recipe.objects.create(
+            title='toast',
+            time_minutes=5,
+            price = 5.00,
+            user=self.user,
+        )
+        recipe2 = Recipe.objects.create(
+            title='poha',
+            time_minutes = 15,
+            price = 25.00,
+            user=self.user,
+        )
+        recipe2.tag.add(tag1)
+        recipe1.tag.add(tag1)
+
+        res = self.client.get(TAG_URL,{'assigned_only':1})
+
+        self.assertEqual(len(res.data),1)
